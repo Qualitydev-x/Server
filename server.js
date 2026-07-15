@@ -91,7 +91,7 @@ app.get("/keys", botAuth, (req, res) => {
 
 // ====== CLIENT VERIFY ======
 app.post("/verify", (req, res) => {
-    const { key, hwid, ip } = req.body;
+    const { key, hwid, ip, discordUserId } = req.body;
     if (!key || !hwid || !ip) return res.json({ ok: false, reason: "bad_request" });
     
     const keyData = data.keys[key];
@@ -100,7 +100,7 @@ app.post("/verify", (req, res) => {
     
     // First activation
     if (!keyData.usedBy) {
-        keyData.usedBy = "user_" + crypto.randomBytes(8).toString("hex");
+        keyData.usedBy = discordUserId || ("user_" + crypto.randomBytes(8).toString("hex"));
         keyData.hwid = hwid;
         keyData.ip = ip;
         keyData.active = true;
@@ -114,6 +114,17 @@ app.post("/verify", (req, res) => {
     }
     
     res.json({ ok: true, tier: keyData.tier });
+});
+
+// ====== GET KEY BY DISCORD USER ID ======
+app.get("/key/user/:userId", botAuth, (req, res) => {
+    const userId = req.params.userId;
+    for (const [keyId, keyData] of Object.entries(data.keys)) {
+        if (keyData.usedBy === userId) {
+            return res.json({ ok: true, key: keyId, ...keyData, expired: isExpired(keyData) });
+        }
+    }
+    res.status(404).json({ ok: false, error: "no_key_found" });
 });
 
 // ====== RESET IP ======
@@ -179,4 +190,3 @@ app.get("/scripts", botAuth, (req, res) => {
 
 app.get("/ping", (req, res) => res.send("pong"));
 app.listen(PORT, () => console.log(`✅ Server V3 running on port ${PORT}`));
-
